@@ -270,16 +270,16 @@ def is_docker_running(folder):
 app = Flask(__name__, static_folder=BASE_DIR)
 
 # ============== تنظيف جلسة قاعدة البيانات بعد كل طلب ==============
-@app.teardown_appcontext
+@main.teardown_appcontext
 def shutdown_session(exception=None):
     db_session.remove()
 
 # ============== إعدادات الجلسة ==============
-app.secret_key = "ELMODMEN_HOST_STABLE_SECRET_KEY_2026"
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
-app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+main.secret_key = "ELMODMEN_HOST_STABLE_SECRET_KEY_2026"
+main.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+main.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024
+main.config['SESSION_COOKIE_HTTPONLY'] = True
+main.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # ============== قاعدة البيانات ==============
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -539,8 +539,8 @@ def start_server_process(folder):
         elif lang == 'nodejs':
             if os.path.exists(os.path.join(srv.path, 'index.js')):
                 main_file = 'index.js'
-            elif os.path.exists(os.path.join(srv.path, 'app.js')):
-                main_file = 'app.js'
+            elif os.path.exists(os.path.join(srv.path, 'main.js')):
+                main_file = 'main.js'
         elif lang == 'java':
             jar_files = [f for f in os.listdir(srv.path) if f.endswith('.jar')]
             if jar_files:
@@ -641,7 +641,7 @@ def get_user_by_api_key(api_key):
     return None, None
 
 # ============== الصفحات ==============
-@app.route('/')
+@main.route('/')
 def home():
     if 'username' not in session:
         return redirect('/login')
@@ -650,26 +650,26 @@ def home():
         return redirect('/admin')
     return redirect('/dashboard')
 
-@app.route('/login')
+@main.route('/login')
 def login_page():
     if 'username' in session:
         return redirect('/')
     return send_from_directory(BASE_DIR, 'login.html')
 
-@app.route('/dashboard')
+@main.route('/dashboard')
 def dashboard():
     if 'username' not in session:
         return redirect('/login')
     return send_from_directory(BASE_DIR, 'index.html')
 
-@app.route('/admin')
+@main.route('/admin')
 def admin_panel():
     if 'username' not in session or not is_admin(session['username']):
         return redirect('/login')
     return send_from_directory(BASE_DIR, 'admin_panel.html')
 
 # ============== API المصادقة ==============
-@app.route('/api/register', methods=['POST'])
+@main.route('/api/register', methods=['POST'])
 def api_register():
     data = request.get_json() or {}
     username = data.get("username", "").strip()
@@ -710,7 +710,7 @@ def api_register():
     
     return jsonify({"success": True, "message": "تم إرسال طلب إنشاء الحساب! سيتم مراجعته من قِبل المسؤول وستُشعر بالنتيجة قريباً.", "pending": True})
 
-@app.route('/api/login', methods=['POST'])
+@main.route('/api/login', methods=['POST'])
 def api_login():
     data = request.get_json() or {}
     username = data.get("username", "").strip()
@@ -745,14 +745,14 @@ def api_login():
         db_session.rollback()
     return jsonify({"success": True, "redirect": "/dashboard", "is_admin": False})
 
-@app.route('/api/logout', methods=['GET', 'POST'])
+@main.route('/api/logout', methods=['GET', 'POST'])
 def api_logout():
     session.clear()
     response = make_response(jsonify({"success": True}))
     response.set_cookie('session', '', expires=0)
     return response
 
-@app.route('/api/current_user')
+@main.route('/api/current_user')
 def api_current_user():
     if "username" in session:
         u = db_session.query(User).filter_by(username=session["username"]).first()
@@ -766,7 +766,7 @@ def api_current_user():
             })
     return jsonify({"success": False})
 
-@app.route('/api/create_api_key', methods=['POST'])
+@main.route('/api/create_api_key', methods=['POST'])
 def create_api_key():
     if 'username' not in session:
         return jsonify({"success": False, "message": "غير مصرح"}), 401
@@ -777,14 +777,14 @@ def create_api_key():
     db_session.commit()
     return jsonify({"success": True, "api_key": new_key})
 
-@app.route('/api/pending_users', methods=['GET'])
+@main.route('/api/pending_users', methods=['GET'])
 def get_pending_users():
     if 'username' not in session or session['username'] != ADMIN_USERNAME:
         return jsonify({"success": False}), 403
     pending = db_session.query(User).filter_by(is_pending=True).all()
     return jsonify({"success": True, "users": [{"username": u.username, "created_at": str(u.created_at)} for u in pending]})
 
-@app.route('/api/approve_user', methods=['POST'])
+@main.route('/api/approve_user', methods=['POST'])
 def approve_user():
     if 'username' not in session or session['username'] != ADMIN_USERNAME:
         return jsonify({"success": False}), 403
@@ -798,7 +798,7 @@ def approve_user():
     add_notification(username, "✅ تم قبول حسابك", "مرحباً! تمت الموافقة على حسابك في 𝙴𝙻𝙼𝙾𝙳𝙼𝙴𝙽 𝙷𝙾𝚂𝚃. يمكنك الآن تسجيل الدخول.")
     return jsonify({"success": True, "message": f"تم قبول {username}"})
 
-@app.route('/api/reject_user', methods=['POST'])
+@main.route('/api/reject_user', methods=['POST'])
 def reject_user():
     if 'username' not in session or session['username'] != ADMIN_USERNAME:
         return jsonify({"success": False}), 403
@@ -811,7 +811,7 @@ def reject_user():
     db_session.commit()
     return jsonify({"success": True, "message": f"تم رفض وحذف {username}"})
 
-@app.route('/api/admin/generate_api_key', methods=['POST'])
+@main.route('/api/admin/generate_api_key', methods=['POST'])
 def admin_generate_api_key():
     if 'username' not in session or session['username'] != ADMIN_USERNAME:
         return jsonify({"success": False}), 403
@@ -823,7 +823,7 @@ def admin_generate_api_key():
     db_session.commit()
     return jsonify({"success": True, "api_key": new_key})
 
-@app.route('/api/link_telegram', methods=['POST'])
+@main.route('/api/link_telegram', methods=['POST'])
 def link_telegram():
     if 'username' not in session:
         return jsonify({"success": False}), 401
@@ -836,7 +836,7 @@ def link_telegram():
     return jsonify({"success": True})
 
 # ============== API الإشعارات ==============
-@app.route('/api/notifications', methods=['GET'])
+@main.route('/api/notifications', methods=['GET'])
 def get_notifications():
     if 'username' not in session:
         return jsonify({"success": False}), 401
@@ -853,7 +853,7 @@ def get_notifications():
         } for n in notifs]
     })
 
-@app.route('/api/notifications/mark_read', methods=['POST'])
+@main.route('/api/notifications/mark_read', methods=['POST'])
 def mark_read():
     if 'username' not in session:
         return jsonify({"success": False}), 401
@@ -864,7 +864,7 @@ def mark_read():
     return jsonify({"success": True})
 
 # ============== API المسؤول ==============
-@app.route('/api/admin/upgrade-user', methods=['POST'])
+@main.route('/api/admin/upgrade-user', methods=['POST'])
 def admin_upgrade_user():
     if 'username' not in session or not is_admin(session['username']):
         return jsonify({"success": False, "message": "غير مصرح"}), 403
@@ -883,7 +883,7 @@ def admin_upgrade_user():
     add_notification(ADMIN_USERNAME, "⭐ ترقية مستخدم", f"تم ترقية المستخدم {target_username} إلى صلاحيات غير محدودة")
     return jsonify({"success": True, "message": f"تم ترقية {target_username} بنجاح"})
 
-@app.route('/api/admin/broadcast', methods=['POST'])
+@main.route('/api/admin/broadcast', methods=['POST'])
 def admin_broadcast():
     if 'username' not in session or not is_admin(session['username']):
         return jsonify({"success": False, "message": "غير مصرح"}), 403
@@ -896,7 +896,7 @@ def admin_broadcast():
     add_notification(ADMIN_USERNAME, "📢 إذاعة", f"تم إرسال إذاعة: {title}")
     return jsonify({"success": True, "message": "تم إرسال الإذاعة لجميع المستخدمين"})
 
-@app.route('/api/admin/users')
+@main.route('/api/admin/users')
 def admin_users():
     if "username" not in session or not is_admin(session["username"]):
         return jsonify({"success": False}), 403
@@ -915,7 +915,7 @@ def admin_users():
         })
     return jsonify({"success": True, "users": users_list})
 
-@app.route('/api/admin/create-user', methods=['POST'])
+@main.route('/api/admin/create-user', methods=['POST'])
 def admin_create_user():
     if "username" not in session or not is_admin(session["username"]):
         return jsonify({"success": False}), 403
@@ -944,7 +944,7 @@ def admin_create_user():
     add_notification(ADMIN_USERNAME, "👤 مستخدم جديد", f"تم إنشاء حساب جديد بواسطة المسؤول: {username}")
     return jsonify({"success": True, "message": "✅ تم إنشاء الحساب"})
 
-@app.route('/api/admin/delete-user', methods=['POST'])
+@main.route('/api/admin/delete-user', methods=['POST'])
 def admin_delete_user():
     if "username" not in session or not is_admin(session["username"]):
         return jsonify({"success": False}), 403
@@ -980,7 +980,7 @@ def admin_delete_user():
     return jsonify({"success": False, "message": "المستخدم موجود"})
 
 # ============== API النظام ==============
-@app.route('/api/system/metrics')
+@main.route('/api/system/metrics')
 def get_metrics():
     return jsonify({
         "cpu": psutil.cpu_percent(),
@@ -988,12 +988,12 @@ def get_metrics():
         "disk": psutil.disk_usage('/').percent
     })
 
-@app.route('/api/ping', methods=['GET', 'POST'])
+@main.route('/api/ping', methods=['GET', 'POST'])
 def ping():
     return jsonify({"status": "pong", "timestamp": str(datetime.now())})
 
 # ============== السيرفرات ==============
-@app.route('/api/servers')
+@main.route('/api/servers')
 def list_servers():
     if "username" not in session:
         return jsonify({"success": False}), 401
@@ -1052,7 +1052,7 @@ def list_servers():
         }
     })
 
-@app.route('/api/server/add', methods=['POST'])
+@main.route('/api/server/add', methods=['POST'])
 def add_server():
     if "username" not in session:
         return jsonify({"success": False, "message": "غير مصرح"}), 401
@@ -1092,7 +1092,7 @@ def add_server():
     db_session.commit()
     return jsonify({"success": True, "message": f"✅ تم إنشاء الخادم {name}"})
 
-@app.route('/api/server/action/<folder>/<action>', methods=['POST'])
+@main.route('/api/server/action/<folder>/<action>', methods=['POST'])
 def server_action(folder, action):
     if "username" not in session:
         return jsonify({"success": False}), 401
@@ -1155,7 +1155,7 @@ def server_action(folder, action):
         return jsonify({"success": True, "message": "🗑️ تم الحذف"})
     return jsonify({"success": False})
 
-@app.route('/api/server/stats/<folder>')
+@main.route('/api/server/stats/<folder>')
 def get_server_stats(folder):
     if "username" not in session:
         return jsonify({"success": False}), 401
@@ -1206,7 +1206,7 @@ def get_server_stats(folder):
     })
 
 # ============== API الملفات ==============
-@app.route('/api/files/list/<folder>')
+@main.route('/api/files/list/<folder>')
 def list_server_files(folder):
     if "username" not in session:
         return jsonify([]), 401
@@ -1233,7 +1233,7 @@ def list_server_files(folder):
         pass
     return jsonify(sorted(files, key=lambda x: (not x['is_dir'], x['name'].lower())))
 
-@app.route('/api/files/content/<folder>/<filename>')
+@main.route('/api/files/content/<folder>/<filename>')
 def get_file_content(folder, filename):
     if "username" not in session:
         return jsonify({"content": ""}), 401
@@ -1251,7 +1251,7 @@ def get_file_content(folder, filename):
     except:
         return jsonify({"content": "[ملف ثنائي]"})
 
-@app.route('/api/files/save/<folder>/<filename>', methods=['POST'])
+@main.route('/api/files/save/<folder>/<filename>', methods=['POST'])
 def save_file_content(folder, filename):
     if "username" not in session:
         return jsonify({"success": False}), 401
@@ -1270,7 +1270,7 @@ def save_file_content(folder, filename):
     except Exception as e:
         return jsonify({"success": False, "message": str(e)})
 
-@app.route('/api/files/create/<folder>', methods=['POST'])
+@main.route('/api/files/create/<folder>', methods=['POST'])
 def create_file(folder):
     if "username" not in session:
         return jsonify({"success": False}), 401
@@ -1290,7 +1290,7 @@ def create_file(folder):
     except Exception as e:
         return jsonify({"success": False, "message": str(e)})
 
-@app.route('/api/files/delete/<folder>', methods=['POST'])
+@main.route('/api/files/delete/<folder>', methods=['POST'])
 def delete_files(folder):
     if "username" not in session:
         return jsonify({"success": False}), 401
@@ -1321,7 +1321,7 @@ def delete_files(folder):
     else:
         return jsonify({"success": False, "message": "فشل الحذف"})
 
-@app.route('/api/files/upload/<folder>', methods=['POST'])
+@main.route('/api/files/upload/<folder>', methods=['POST'])
 def upload_files(folder):
     if "username" not in session:
         return jsonify({"success": False}), 401
@@ -1365,7 +1365,7 @@ def upload_files(folder):
     else:
         return jsonify({"success": False, "message": "فشل الرفع"})
 
-@app.route('/api/files/unzip/<folder>/<filename>', methods=['POST'])
+@main.route('/api/files/unzip/<folder>/<filename>', methods=['POST'])
 def unzip_file(folder, filename):
     if "username" not in session:
         return jsonify({"success": False}), 401
@@ -1384,7 +1384,7 @@ def unzip_file(folder, filename):
     except Exception as e:
         return jsonify({"success": False, "message": f"❌ فشل: {str(e)}"})
 
-@app.route('/api/server/set-startup/<folder>', methods=['POST'])
+@main.route('/api/server/set-startup/<folder>', methods=['POST'])
 def set_startup_file(folder):
     if "username" not in session:
         return jsonify({"success": False}), 401
@@ -1402,7 +1402,7 @@ def set_startup_file(folder):
     db_session.commit()
     return jsonify({"success": True, "message": f"✅ تم تعيين {filename} كملف التشغيل"})
 
-@app.route('/api/server/install/<folder>', methods=['POST'])
+@main.route('/api/server/install/<folder>', methods=['POST'])
 def install_requirements(folder):
     if "username" not in session:
         return jsonify({"success": False}), 401
@@ -1427,7 +1427,7 @@ def install_requirements(folder):
     return jsonify({"success": False, "message": "requirements.txt غير موجود"})
 
 # ============== API للبوت ==============
-@app.route('/api/bot/verify', methods=['POST'])
+@main.route('/api/bot/verify', methods=['POST'])
 def bot_verify():
     data = request.get_json() or {}
     api_key = data.get('api_key', '').strip()
@@ -1445,7 +1445,7 @@ def bot_verify():
         "is_unlimited": user.is_unlimited
     })
 
-@app.route('/api/bot/servers', methods=['GET'])
+@main.route('/api/bot/servers', methods=['GET'])
 def bot_list_servers():
     api_key = request.args.get('api_key')
     if not api_key:
@@ -1480,7 +1480,7 @@ def bot_list_servers():
         })
     return jsonify({"success": True, "servers": user_servers})
 
-@app.route('/api/bot/server/action', methods=['POST'])
+@main.route('/api/bot/server/action', methods=['POST'])
 def bot_server_action():
     data = request.get_json() or {}
     api_key = data.get('api_key')
@@ -1551,7 +1551,7 @@ def bot_server_action():
     else:
         return jsonify({"success": False, "message": "إجراء غير معروف"})
 
-@app.route('/api/bot/console', methods=['GET'])
+@main.route('/api/bot/console', methods=['GET'])
 def bot_console():
     api_key = request.args.get('api_key')
     folder = request.args.get('folder')
@@ -1574,7 +1574,7 @@ def bot_console():
             pass
     return jsonify({"success": True, "logs": logs})
 
-@app.route('/api/bot/files/list', methods=['GET'])
+@main.route('/api/bot/files/list', methods=['GET'])
 def bot_files_list():
     api_key = request.args.get('api_key')
     folder = request.args.get('folder')
@@ -1615,7 +1615,7 @@ def bot_files_list():
         pass
     return jsonify({"success": True, "files": files, "current_path": path})
 
-@app.route('/api/bot/files/content', methods=['GET'])
+@main.route('/api/bot/files/content', methods=['GET'])
 def bot_file_content():
     api_key = request.args.get('api_key')
     folder = request.args.get('folder')
@@ -1640,7 +1640,7 @@ def bot_file_content():
     except:
         return jsonify({"success": False, "message": "فشل قراءة الملف"}), 500
 
-@app.route('/api/bot/files/save', methods=['POST'])
+@main.route('/api/bot/files/save', methods=['POST'])
 def bot_file_save():
     data = request.get_json() or {}
     api_key = data.get('api_key')
@@ -1665,7 +1665,7 @@ def bot_file_save():
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
-@app.route('/api/bot/files/delete', methods=['POST'])
+@main.route('/api/bot/files/delete', methods=['POST'])
 def bot_file_delete():
     data = request.get_json() or {}
     api_key = data.get('api_key')
@@ -1691,7 +1691,7 @@ def bot_file_delete():
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
-@app.route('/api/bot/files/upload', methods=['POST'])
+@main.route('/api/bot/files/upload', methods=['POST'])
 def bot_file_upload():
     api_key = request.form.get('api_key')
     folder = request.form.get('folder')
@@ -1723,7 +1723,7 @@ def bot_file_upload():
     uploaded_file.save(full_path)
     return jsonify({"success": True, "message": f"تم رفع {filename}"})
 
-@app.route('/api/bot/files/create_folder', methods=['POST'])
+@main.route('/api/bot/files/create_folder', methods=['POST'])
 def bot_create_folder():
     data = request.get_json() or {}
     api_key = data.get('api_key')
@@ -1744,7 +1744,7 @@ def bot_create_folder():
     os.makedirs(target_dir, exist_ok=True)
     return jsonify({"success": True, "message": f"تم إنشاء المجلد {folder_name}"})
 
-@app.route('/api/bot/install', methods=['POST'])
+@main.route('/api/bot/install', methods=['POST'])
 def bot_install():
     data = request.get_json() or {}
     api_key = data.get('api_key')
@@ -1774,7 +1774,7 @@ def bot_install():
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
-@app.route('/api/bot/set_startup', methods=['POST'])
+@main.route('/api/bot/set_startup', methods=['POST'])
 def bot_set_startup():
     data = request.get_json() or {}
     api_key = data.get('api_key')
@@ -1795,7 +1795,7 @@ def bot_set_startup():
     db_session.commit()
     return jsonify({"success": True, "message": f"تم تعيين {filename} كملف التشغيل"})
 
-@app.route('/api/bot/create_server', methods=['POST'])
+@main.route('/api/bot/create_server', methods=['POST'])
 def bot_create_server():
     data = request.get_json() or {}
     api_key = data.get('api_key')
@@ -1835,13 +1835,13 @@ def bot_create_server():
     return jsonify({"success": True, "message": f"✅ تم إنشاء {name}", "folder": folder, "port": assigned_port})
 
 # ============== API Docker ==============
-@app.route('/api/docker/status')
+@main.route('/api/docker/status')
 def docker_status():
     if "username" not in session:
         return jsonify({"success": False}), 401
     return jsonify({"success": True, "available": DOCKER_AVAILABLE})
 
-@app.route('/api/docker/container_logs/<folder>')
+@main.route('/api/docker/container_logs/<folder>')
 def container_logs(folder):
     if "username" not in session:
         return jsonify({"success": False}), 401
@@ -1851,7 +1851,7 @@ def container_logs(folder):
     logs = get_docker_logs(folder) or "لا توجد logs من Docker"
     return jsonify({"success": True, "logs": logs})
 
-@app.route('/api/docker/generate_dockerfile/<folder>', methods=['POST'])
+@main.route('/api/docker/generate_dockerfile/<folder>', methods=['POST'])
 def api_generate_dockerfile(folder):
     if "username" not in session:
         return jsonify({"success": False}), 401
@@ -1867,7 +1867,7 @@ def api_generate_dockerfile(folder):
     return jsonify({"success": True, "message": "✅ تم إنشاء Dockerfile", "content": content})
 
 # ============== Admin: تحميل ملفات أي مستخدم ==============
-@app.route('/api/admin/download_user_file', methods=['POST'])
+@main.route('/api/admin/download_user_file', methods=['POST'])
 def admin_download_user_file():
     if "username" not in session or not is_admin(session["username"]):
         return jsonify({"success": False, "message": "غير مصرح"}), 403
@@ -1892,7 +1892,7 @@ def admin_download_user_file():
     
     return send_file(full_path, as_attachment=True, download_name=os.path.basename(full_path))
 
-@app.route('/api/admin/list_user_servers/<username>')
+@main.route('/api/admin/list_user_servers/<username>')
 def admin_list_user_servers(username):
     if "username" not in session or not is_admin(session["username"]):
         return jsonify({"success": False}), 403
@@ -1902,7 +1902,7 @@ def admin_list_user_servers(username):
         for s in servers
     ]})
 
-@app.route('/api/admin/list_user_files/<username>/<folder>')
+@main.route('/api/admin/list_user_files/<username>/<folder>')
 def admin_list_user_files(username, folder):
     if "username" not in session or not is_admin(session["username"]):
         return jsonify({"success": False}), 403
@@ -1982,4 +1982,4 @@ if __name__ == "__main__":
     print(f"👤 بيانات المسؤول: {ADMIN_USERNAME} | كلمة السر: {ADMIN_PASSWORD_RAW}")
     print("=" * 60)
 
-    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
+    main.run(host="0.0.0.0", port=port, debug=False, threaded=True)
